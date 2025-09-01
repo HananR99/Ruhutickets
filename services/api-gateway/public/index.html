@@ -1,0 +1,469 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RuhuTickets</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial; margin: 24px; max-width: 1600px }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 8px; margin: 12px 0 }
+    button { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background:#fff; cursor:pointer }
+    input, select { padding: 8px; margin-right: 8px }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin: 8px 0 }
+    .muted { color:#666; font-size: 0.9em }
+    .ok { color:#066e0a } .err { color:#a30000 }
+    .tabs { display:flex; gap:12px; margin: 12px 0 }
+    .tab { padding:8px 12px; border-radius:8px; border:1px solid #333; cursor:pointer }
+    .tab.active { background:#333; color:#fff }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(420px,1fr)); gap:12px }
+    table { border-collapse: collapse; width:100% }
+    td, th { border: 1px solid #ddd; padding: 6px 8px }
+    th { background:#f6f6f6; text-align:left }
+  </style>
+</head>
+<body>
+  <div id="flash" style="
+    position:sticky;top:0;left:0;right:0;z-index:9999;
+    background:#e7f6ec;border:1px solid #b9e2c8;color:#064b2d;
+    padding:8px 12px;margin:0 0 12px 0;border-radius:8px;display:none">
+  </div>
+  <h1>RuhuTickets</h1>
+  <p class="muted">A Simple Demo</p>
+  <button id="btnLogout" style="float:right; margin-top:-32px;">Log Out</button>
+
+  <div class="tabs">
+    <div id="tab-buyer" class="tab">Buyer</div>
+    <div id="tab-admin" class="tab">Admin</div>
+  </div>
+
+  <div id="buyer"></div>
+  <div id="admin" style="display:none"></div>
+
+  <script>
+    document.getElementById('btnLogout').onclick = () => {
+      localStorage.removeItem('jwt');
+      window.location.href = 'login.html';
+    };
+
+    // —— grab main containers & helper —— 
+    const buyerEl = document.getElementById('buyer');
+    const adminEl = document.getElementById('admin');
+    const el      = html => {
+      const d = document.createElement('div');
+      d.innerHTML = html.trim();
+      return d.firstChild;
+    };
+
+    // —— enforce JWT presence & parse role —— 
+    const token = localStorage.getItem('jwt');
+    if (!token) {
+      // no token → back to login
+      window.location.href = 'login.html';
+      throw new Error('Redirecting to login');
+    }
+    function parseJwt(t) {
+      const p = t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+      return JSON.parse(atob(p));
+    }
+    const claims = parseJwt(token);
+    const role   = claims.role || '';
+
+    // hide the disallowed tab
+    if (role === 'buyer') {
+      document.getElementById('tab-admin').style.display = 'none';
+    } else {
+      document.getElementById('tab-buyer').style.display = 'none';
+    }
+
+    // —— generic API wrapper that sends our JWT —— 
+    const api = (p, opt = {}) => fetch(p, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        ...(opt.headers||{})
+      },
+      ...opt
+    }).then(async r => {
+      const ct   = r.headers.get('content-type') || '';
+      const data = ct.includes('application/json') ? await r.json() : await r.text();
+      if (!r.ok) throw Object.assign(
+        new Error(typeof data === 'string' ? data : (data.error || 'HTTP ' + r.status)),
+        { status: r.status, data }
+      );
+      return data;
+    });
+
+    // —— wire tabs —— 
+    const tabBuyer = document.getElementById('tab-buyer');
+    const tabAdmin = document.getElementById('tab-admin');
+    tabBuyer.onclick = () => {
+      tabBuyer.classList.add('active');
+      tabAdmin.classList.remove('active');
+      buyerEl.style.display  = 'block';
+      adminEl.style.display  = 'none';
+    };
+    tabAdmin.onclick = () => {
+      tabAdmin.classList.add('active');
+      tabBuyer.classList.remove('active');
+      adminEl.style.display = 'block';
+      buyerEl.style.display = 'none';
+    };
+
+    // default‐select correct tab and kick off renders
+    if (role === 'admin') tabAdmin.click();
+    else                  tabBuyer.click();
+
+    renderBuyer();
+    renderAdmin();
+
+    // —— buyer UI —— 
+    async function renderBuyer(){
+      buyerEl.innerHTML = '';
+      let events = [];
+      try { events = await api('/api/v1/events'); } catch (_) {}
+      if (!Array.isArray(events) || !events.length) {
+        buyerEl.appendChild(el(`<div class="card">No events yet. Create one in Admin tab.</div>`));
+        return;
+      }
+      const wrap = el(`<div class="grid"></div>`);
+      buyerEl.appendChild(wrap);
+
+      for (const e of events) {
+        const card = el(`
+          <div class="card">
+            <h2>${e.name}</h2>
+            <div class="muted">${new Date(e.start_time).toLocaleString()} @ ${e.venue}</div>
+            <div class="row">
+              <select class="tt"></select>
+              <input class="qty" type="number" min="1" value="2" />
+              <button class="reserve">Reserve</button>
+              <span class="reserveOut muted"></span>
+            </div>
+            <div class="row">
+              <input class="rid" placeholder="reservationId" size="45" />
+              <button class="pay">Pay & Commit</button>
+              <span class="payOut muted"></span>
+            </div>
+          </div>
+        `);
+        wrap.appendChild(card);
+
+        // load ticket types
+        try {
+          const sel   = card.querySelector('.tt');
+          sel.innerHTML = '';
+          const types = await api(`/api/v1/inventory/ticket-types?eventId=${encodeURIComponent(e.id)}`);
+          if (Array.isArray(types) && types.length) {
+            for (const t of types) {
+              const o = document.createElement('option');
+              o.value = t.id;
+              o.textContent = `${t.name} — ${(t.price_cents/100).toFixed(2)} ${t.currency} (left: ${t.total_qty - t.sold_qty})`;
+              sel.appendChild(o);
+            }
+          } else {
+            sel.appendChild(new Option('No ticket types',''));
+          }
+        } catch {
+          const out = card.querySelector('.reserveOut');
+          out.className = 'err';
+          out.textContent = 'Failed to load ticket types';
+        }
+
+        // reserve action
+        card.querySelector('.reserve').onclick = async () => {
+          const ticketTypeId = card.querySelector('.tt').value;
+          const qty          = +card.querySelector('.qty').value;
+          const out          = card.querySelector('.reserveOut');
+          out.className='muted'; out.textContent='Reserving...';
+          try {
+            const r = await api('/api/v1/inventory/reserve', {
+              method:'POST',
+              body: JSON.stringify({ ticketTypeId, qty })
+            });
+            out.className='ok';
+            out.textContent = `Reservation: ${r.reservationId} (expires in ${r.expiresInSeconds}s)`;
+            card.querySelector('.rid').value = r.reservationId;
+          } catch (e) {
+            out.className='err';
+            out.textContent = e.message || 'Reserve failed';
+          }
+        };
+
+        // pay action
+        card.querySelector('.pay').onclick = async () => {
+          const rid = card.querySelector('.rid').value.trim();
+          const out = card.querySelector('.payOut');
+          out.className='muted'; out.textContent='Paying...';
+          try {
+            const r    = await api('/api/v1/webhooks/payment/charge', {
+              method:'POST',
+              body: JSON.stringify({ reservationId: rid })
+            });
+            const info = r.reservation || {};
+            const when = info.start_time ? new Date(info.start_time).toLocaleString() : '';
+            const qty  = (info.qty ?? '').toString();
+            const type = info.ticket_type ? ` × ${info.ticket_type}` : '';
+            const evt  = info.event_name ? ` for ${info.event_name}` : '';
+            const line = info.event_name
+              ? `Booked ${qty}${type}${evt}${when ? ' — ' + when : ''}`
+              : (r.message || 'Payment successful');
+            out.className='ok';
+            out.textContent = '✅ ' + line;
+            showFlash('✅ ' + line);
+            renderBuyer();
+            renderAdmin();
+          } catch (e) {
+            out.className='err';
+            out.textContent = e.message || 'Payment failed';
+          }
+        };
+      }
+    }
+
+    // —— admin UI —— 
+    async function renderAdmin(){
+      adminEl.innerHTML = '';
+
+      // Create Event
+      const evCard = el(`
+        <div class="card">
+          <h2>Create Event</h2>
+          <div class="row">
+            <input id="name" placeholder="name" />
+            <input id="venue" placeholder="venue" />
+          </div>
+          <div class="row">
+            <input id="start" type="datetime-local" />
+            <input id="end"   type="datetime-local" />
+            <button id="createEv">Create</button>
+            <span id="evOut" class="muted"></span>
+          </div>
+        </div>
+      `);
+      adminEl.appendChild(evCard);
+
+      // Create Ticket Type
+      const ttCard = el(`
+        <div class="card">
+          <h2>Create Ticket Type</h2>
+          <div class="row">
+            <select id="eventSelect"></select>
+            <input id="tname" placeholder="name (VIP/General)" />
+          </div>
+          <div class="row">
+            <input id="price" type="number" placeholder="price cents (e.g., 50000)" />
+            <input id="cur"   value="LKR" size="6" />
+            <input id="qty"   type="number" placeholder="total qty" />
+            <button id="createTT">Add</button>
+            <span id="ttOut" class="muted"></span>
+          </div>
+        </div>
+      `);
+      adminEl.appendChild(ttCard);
+
+      // Manage Events table
+      const listCard = el(`
+        <div class="card">
+          <h2>Manage Events</h2>
+          <div class="row">
+            <button id="refreshEv">Refresh</button>
+          </div>
+          <div id="evList"></div>
+        </div>
+      `);
+      adminEl.appendChild(listCard);
+
+      async function loadEventsTable(){
+        const [rows, stats] = await Promise.all([
+          api('/api/v1/events'),
+          api('/api/v1/inventory/event-stats')
+        ]);
+        const sMap = Object.fromEntries(stats.map(s => [s.id,s]));
+
+        if (!rows.length) {
+          listCard.querySelector('#evList').innerHTML = '<div class="muted">No events yet.</div>';
+          return;
+        }
+
+        listCard.querySelector('#evList').innerHTML = `
+          <table>
+            <thead>
+              <tr><th>name</th><th>venue</th><th>start</th><th>end</th><th>sold (by type)</th><th></th></tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => {
+                const st = sMap[r.id]||{sold_total:0,by_type:[]};
+                const by = st.by_type.map(bt=>`${bt.name}: ${bt.sold}`).join(', ');
+                return `
+                  <tr data-id="${r.id}">
+                    <td><input class="en" value="${r.name}"/></td>
+                    <td><input class="ev" value="${r.venue}"/></td>
+                    <td><input class="es" type="datetime-local" value="${toLocalDT(r.start_time)}"/></td>
+                    <td><input class="ee" type="datetime-local" value="${toLocalDT(r.end_time)}"/></td>
+                    <td>${st.sold_total}${by?` (${by})`:''}</td>
+                    <td>
+                      <button class="save">Save</button>
+                      <button class="del" style="border-color:#a00;color:#a00">Delete</button>
+                    </td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>`;
+        // Save/Delete handlers
+        listCard.querySelectorAll('.save').forEach(btn=>{
+          btn.onclick = async ()=>{
+            const tr = btn.closest('tr'), id = tr.dataset.id;
+            const payload = {
+              name: tr.querySelector('.en').value,
+              venue: tr.querySelector('.ev').value,
+              start_time: new Date(tr.querySelector('.es').value).toISOString(),
+              end_time:   new Date(tr.querySelector('.ee').value).toISOString()
+            };
+            await api(`/api/v1/events/${id}`, { method:'PUT', body: JSON.stringify(payload) });
+            renderBuyer(); renderAdmin();
+          };
+        });
+        listCard.querySelectorAll('.del').forEach(btn=>{
+          btn.onclick = async ()=>{
+            const tr = btn.closest('tr'), id = tr.dataset.id;
+            if (!confirm('Delete this event and related data?')) return;
+            await api(`/api/v1/events/${id}`, { method:'DELETE' });
+            renderBuyer(); renderAdmin();
+          };
+        });
+      }
+      function toLocalDT(iso){
+        const d = new Date(iso), pad = n=>String(n).padStart(2,'0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+             + `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+
+      listCard.querySelector('#refreshEv').onclick = loadEventsTable;
+      
+      await loadEventsTable();
+
+      // Reservations section
+      const resCard = el(`
+        <div class="card">
+          <h2>Reservations</h2>
+          <div class="row">
+            <select id="resEvent"><option value="">All events</option></select>
+            <button id="refreshRes">Refresh</button>
+          </div>
+          <div id="resTbl"></div>
+        </div>
+      `);
+      adminEl.appendChild(resCard);
+
+      // fill event dropdowns
+      const evSel  = ttCard.querySelector('#eventSelect');
+      const resSel = resCard.querySelector('#resEvent');
+      (await api('/api/v1/events')||[]).forEach(ev=>{
+        evSel .appendChild(new Option(`${ev.name} @ ${ev.venue}`, ev.id));
+        resSel.appendChild(new Option(ev.name, ev.id));
+      });
+
+      // create event handler
+      evCard.querySelector('#createEv').onclick = async ()=>{
+        const name  = evCard.querySelector('#name').value.trim();
+        const venue = evCard.querySelector('#venue').value.trim();
+        const start = evCard.querySelector('#start').value;
+        const end   = evCard.querySelector('#end').value;
+        const out   = evCard.querySelector('#evOut');
+        out.className='muted'; out.textContent='Creating...';
+        try {
+          const r = await api('/api/v1/events',{
+            method:'POST',
+            body: JSON.stringify({
+              name, venue,
+              start_time: new Date(start).toISOString(),
+              end_time:   new Date(end).toISOString()
+            })
+          });
+          out.className='ok';
+          out.textContent = 'Created: '+r.id;
+          evSel .appendChild(new Option(`${r.name} @ ${r.venue}`, r.id));
+          resSel.appendChild(new Option(r.name, r.id));
+          evSel.value = r.id;
+          renderBuyer();
+        } catch(e) {
+          out.className='err';
+          out.textContent = e.data?.error || e.message;
+        }
+      };
+
+      // create ticket type
+      ttCard.querySelector('#createTT').onclick = async ()=>{
+        const payload = {
+          event_id:    evSel.value,
+          name:        ttCard.querySelector('#tname').value.trim(),
+          price_cents: +ttCard.querySelector('#price').value,
+          currency:    ttCard.querySelector('#cur').value.trim(),
+          total_qty:   +ttCard.querySelector('#qty').value
+        };
+        const out = ttCard.querySelector('#ttOut');
+        out.className='muted'; out.textContent='Adding...';
+        try {
+          const r = await api('/api/v1/inventory/ticket-types',{
+            method:'POST',
+            body: JSON.stringify(payload)
+          });
+          out.className='ok';
+          out.textContent = 'Added: '+r.id;
+          renderBuyer();
+        } catch(e) {
+          out.className='err';
+          out.textContent = e.data?.error || e.message;
+        }
+      };
+
+      // load reservations
+      async function loadRes(){
+        const chosen = resSel.value;
+        let rows = [];
+        try {
+          rows = await api(`/api/v1/inventory/reservations${chosen ? ('?eventId='+encodeURIComponent(chosen)) : ''}`);
+        } catch(e) {
+          resCard.querySelector('#resTbl').innerHTML = `<div class="err">${e.data?.error||e.message}</div>`;
+          return;
+        }
+        if (!rows.length) {
+          resCard.querySelector('#resTbl').innerHTML = `<div class="muted">No reservations yet.</div>`;
+          return;
+        }
+        const html = `
+          <table>
+            <thead>
+              <tr><th>id</th><th>event</th><th>booked time</th><th>tickets</th><th>status</th></tr>
+            </thead>
+            <tbody>
+              ${rows.map(r=>`
+                <tr>
+                  <td>${r.id}</td>
+                  <td>${r.event_name}</td>
+                  <td>${r.booked_at?new Date(r.booked_at).toLocaleString():''}</td>
+                  <td>${r.qty}${r.ticket_type?` (${r.ticket_type})`:''}</td>
+                  <td>${r.status}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+        resCard.querySelector('#resTbl').innerHTML = html;
+      }
+      resCard.querySelector('#refreshRes').onclick = loadRes;
+      resSel.onchange = loadRes;
+      loadRes();
+    }
+
+    // —— global flash banner —— 
+    function showFlash(msg){
+      const box = document.getElementById('flash');
+      box.textContent = msg;
+      box.style.display = 'block';
+      clearTimeout(showFlash._t);
+      showFlash._t = setTimeout(()=> box.style.display='none', 6000);
+    }
+  </script>
+</body>
+</html>

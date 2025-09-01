@@ -1,0 +1,18 @@
+# env
+.env
+deploy/compose/.env
+
+# node
+**/node_modules/
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+
+# OS/editor
+.DS_Store
+*.swp
+
+# docker & build
+**/dist/
+**/build/
+**/.cache/

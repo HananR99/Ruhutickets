@@ -62,7 +62,7 @@ kubectl -n ingress-nginx port-forward svc/ingress-nginx 18080:80
 Edit your hosts file:
 127.0.0.1 ruhutickets.local
 
-App UI 👉 http://ruhutickets.local/login.html
+App UI 👉 http://ruhutickets.local:18080/login.html
 
 Health check:
 curl -i -H "Host: ruhutickets.local" http://127.0.0.1:18080/health

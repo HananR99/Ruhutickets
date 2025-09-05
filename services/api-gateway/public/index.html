@@ -5,39 +5,216 @@
   <title>RuhuTickets</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, Arial; margin: 24px; max-width: 1600px }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 8px; margin: 12px 0 }
-    button { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background:#fff; cursor:pointer }
-    input, select { padding: 8px; margin-right: 8px }
-    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin: 8px 0 }
-    .muted { color:#666; font-size: 0.9em }
-    .ok { color:#066e0a } .err { color:#a30000 }
-    .tabs { display:flex; gap:12px; margin: 12px 0 }
-    .tab { padding:8px 12px; border-radius:8px; border:1px solid #333; cursor:pointer }
-    .tab.active { background:#333; color:#fff }
-    .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(420px,1fr)); gap:12px }
-    table { border-collapse: collapse; width:100% }
-    td, th { border: 1px solid #ddd; padding: 6px 8px }
-    th { background:#f6f6f6; text-align:left }
+    :root{
+      --bg: #f7f7f8;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --ring: #2563eb20;
+      --brand: #2563eb;
+      --brand-600:#1d4ed8;
+      --success:#0e9f6e;
+      --danger:#dc2626;
+      --card-radius: 14px;
+      --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
+      --table-stripe:#fafafa;
+      --tab-bg:#ffffff;
+      --tab-border:#e5e7eb;
+      --tab-active-bg:#111827;
+      --tab-active-fg:#ffffff;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0b0d10;
+        --panel:#111317;
+        --text:#e5e7eb;
+        --muted:#9ca3af;
+        --border:#1f242b;
+        --ring:#3b82f620;
+        --brand:#3b82f6;
+        --brand-600:#2563eb;
+        --success:#10b981;
+        --danger:#ef4444;
+        --table-stripe:#0f1216;
+        --tab-bg:#0e1115;
+        --tab-border:#1f242b;
+        --tab-active-bg:#e5e7eb;
+        --tab-active-fg:#0b0d10;
+      }
+    }
+
+    /* Base */
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+      margin:0;
+      color:var(--text);
+      background:radial-gradient(1200px 600px at 10% -10%, #2563eb0d, transparent 60%), var(--bg);
+    }
+
+    /* App Shell */
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .topbar {
+      position: sticky; top: 0; z-index: 1000;
+      backdrop-filter: saturate(180%) blur(8px);
+      background: color-mix(in oklab, var(--panel) 88%, transparent);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar__inner { max-width: 1200px; margin: 0 auto; padding: 14px 24px; display:flex; align-items:center; gap:16px; }
+    .brand { display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:.2px; }
+    .brand__dot{ width:12px; height:12px; border-radius:50%; background: conic-gradient(from 0deg, var(--brand), var(--success)); box-shadow: 0 0 0 6px var(--ring); }
+    .brand small{ color:var(--muted); font-weight:500 }
+
+    /* Buttons */
+    button {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform .03s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+      box-shadow: var(--shadow-sm);
+    }
+    button:hover { box-shadow: var(--shadow); }
+    button:active { transform: translateY(1px); }
+    .btn-primary{
+      background: linear-gradient(180deg, var(--brand), var(--brand-600));
+      color: #fff;
+      border-color: transparent;
+    }
+    .btn-outline{
+      background: transparent;
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+    .btn-danger{
+      border-color: color-mix(in oklab, var(--danger) 40%, var(--border));
+      color: var(--danger);
+      background: transparent;
+    }
+
+    /* Inputs */
+    input, select {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease;
+      box-shadow: var(--shadow-sm) inset;
+    }
+    input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 4px var(--ring); }
+    input::placeholder { color: var(--muted); }
+
+    /* Layout Helpers */
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: 10px 0 }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:14px }
+    .muted { color: var(--muted); font-size: .92em }
+    .ok { color: var(--success) } .err { color: var(--danger) }
+
+    /* Cards */
+    .card {
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: 14px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .card h2 { margin: 0 0 6px 0; font-size: 1.05rem }
+    .section { display:grid; gap:14px }
+
+    /* Tabs */
+    .tabs { display:flex; gap:10px; }
+    .tab {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--tab-border);
+      background: var(--tab-bg);
+      cursor: pointer;
+      user-select:none;
+    }
+    .tab.active { background: var(--tab-active-bg); color: var(--tab-active-fg); border-color: transparent; box-shadow: var(--shadow) }
+
+    /* Tables */
+    table { border-collapse: collapse; width:100%; overflow:hidden; border-radius: 12px; }
+    thead th {
+      background: linear-gradient(180deg, #f6f7f9, #f1f2f4);
+      color:#3b3f45;
+      border-bottom:1px solid var(--border);
+    }
+    @media (prefers-color-scheme: dark){
+      thead th { background: linear-gradient(180deg, #14181e, #11151a); color: #cfd3da; }
+    }
+    td, th { border: 1px solid var(--border); padding: 10px 12px; text-align:left; }
+    tbody tr:nth-child(odd){ background: var(--table-stripe); }
+    tbody tr:hover{ outline: 2px solid var(--ring); }
+
+    /* Flash */
+    #flash {
+      position:sticky; top:64px; left:0; right:0; z-index:9999;
+      background: color-mix(in oklab, var(--success) 10%, var(--panel));
+      border: 1px solid color-mix(in oklab, var(--success) 40%, var(--border));
+      color: color-mix(in oklab, var(--success) 70%, var(--text));
+      padding:10px 14px; margin:12px auto; border-radius:12px; display:none;
+      max-width: 1200px; box-shadow: var(--shadow);
+      animation: flash-in .25s ease-out;
+    }
+    @keyframes flash-in { from { opacity:0; transform: translateY(-4px);} to { opacity:1; transform: translateY(0);} }
+
+    /* Header actions */
+    .top-actions { margin-left:auto; display:flex; gap:8px; align-items:center }
+    #btnLogout { margin:0 }
+
+    /* Page headings */
+    .page-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin: 18px 0 12px }
+    h1 { font-size: 1.6rem; margin: 0 }
+    .subtitle { color:var(--muted); font-weight:500 }
+
+    /* Fine-tune small screens */
+    @media (max-width: 520px){
+      .topbar__inner{ padding: 12px 16px; }
+      .container{ padding: 16px; }
+      .grid{ grid-template-columns: 1fr; }
+      .row{ gap:8px }
+    }
   </style>
 </head>
 <body>
-  <div id="flash" style="
-    position:sticky;top:0;left:0;right:0;z-index:9999;
-    background:#e7f6ec;border:1px solid #b9e2c8;color:#064b2d;
-    padding:8px 12px;margin:0 0 12px 0;border-radius:8px;display:none">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar__inner">
+      <div class="brand">
+        <span class="brand__dot" aria-hidden="true"></span>
+        <div>RuhuTickets <small>Demo</small></div>
+      </div>
+      <div class="tabs" style="margin-left:12px">
+        <div id="tab-buyer" class="tab">Buyer</div>
+        <div id="tab-admin" class="tab">Admin</div>
+      </div>
+      <div class="top-actions">
+        <button id="btnLogout" class="btn-outline">Log Out</button>
+      </div>
+    </div>
   </div>
-  <h1>RuhuTickets</h1>
-  <p class="muted">A Simple Demo</p>
-  <button id="btnLogout" style="float:right; margin-top:-32px;">Log Out</button>
 
-  <div class="tabs">
-    <div id="tab-buyer" class="tab">Buyer</div>
-    <div id="tab-admin" class="tab">Admin</div>
+  <!-- Flash message -->
+  <div id="flash"></div>
+
+  <!-- Main -->
+  <div class="container">
+    <div class="page-head">
+      <h1>Events & Management</h1>
+      <div class="subtitle">Simple, fast ticketing</div>
+    </div>
+
+    <div id="buyer" class="section"></div>
+    <div id="admin" class="section" style="display:none"></div>
   </div>
-
-  <div id="buyer"></div>
-  <div id="admin" style="display:none"></div>
 
   <script>
     document.getElementById('btnLogout').onclick = () => {
@@ -130,12 +307,12 @@
             <div class="row">
               <select class="tt"></select>
               <input class="qty" type="number" min="1" value="2" />
-              <button class="reserve">Reserve</button>
+              <button class="reserve btn-primary">Reserve</button>
               <span class="reserveOut muted"></span>
             </div>
             <div class="row">
               <input class="rid" placeholder="reservationId" size="45" />
-              <button class="pay">Pay & Commit</button>
+              <button class="pay btn-primary">Pay & Commit</button>
               <span class="payOut muted"></span>
             </div>
           </div>
@@ -229,7 +406,7 @@
           <div class="row">
             <input id="start" type="datetime-local" />
             <input id="end"   type="datetime-local" />
-            <button id="createEv">Create</button>
+            <button id="createEv" class="btn-primary">Create</button>
             <span id="evOut" class="muted"></span>
           </div>
         </div>
@@ -248,7 +425,7 @@
             <input id="price" type="number" placeholder="price cents (e.g., 50000)" />
             <input id="cur"   value="LKR" size="6" />
             <input id="qty"   type="number" placeholder="total qty" />
-            <button id="createTT">Add</button>
+            <button id="createTT" class="btn-primary">Add</button>
             <span id="ttOut" class="muted"></span>
           </div>
         </div>
@@ -260,7 +437,7 @@
         <div class="card">
           <h2>Manage Events</h2>
           <div class="row">
-            <button id="refreshEv">Refresh</button>
+            <button id="refreshEv" class="btn-outline">Refresh</button>
           </div>
           <div id="evList"></div>
         </div>
@@ -296,8 +473,8 @@
                     <td><input class="ee" type="datetime-local" value="${toLocalDT(r.end_time)}"/></td>
                     <td>${st.sold_total}${by?` (${by})`:''}</td>
                     <td>
-                      <button class="save">Save</button>
-                      <button class="del" style="border-color:#a00;color:#a00">Delete</button>
+                      <button class="save btn-primary">Save</button>
+                      <button class="del btn-danger">Delete</button>
                     </td>
                   </tr>`;
               }).join('')}
@@ -342,7 +519,7 @@
           <h2>Reservations</h2>
           <div class="row">
             <select id="resEvent"><option value="">All events</option></select>
-            <button id="refreshRes">Refresh</button>
+            <button id="refreshRes" class="btn-outline">Refresh</button>
           </div>
           <div id="resTbl"></div>
         </div>

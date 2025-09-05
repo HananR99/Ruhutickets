@@ -4,18 +4,16 @@ import { z } from 'zod';
 import Redis from 'ioredis';
 const redis = new Redis({ host: process.env.REDIS_HOST || 'localhost', port: +(process.env.REDIS_PORT||6379) });
 
-// ---------- existing: list events ----------
 export const eventsRoute = async (_req, res) => {
   const { rows } = await pool.query('select id,name,venue,start_time,end_time from events order by start_time asc');
   res.json(rows);
 };
 
-// ---------- NEW: create event ----------
 const CreateEvent = z.object({
   name: z.string().min(2),
   venue: z.string().min(1),
-  start_time: z.string(), // ISO
-  end_time: z.string(),   // ISO
+  start_time: z.string(), 
+  end_time: z.string(),   
 });
 export const createEventRoute = async (req,res) => {
   const r = CreateEvent.safeParse(req.body);
@@ -29,7 +27,7 @@ export const createEventRoute = async (req,res) => {
   res.status(201).json({ id, name, venue, start_time, end_time });
 };
 
-// ---------- existing: reserve (now also records in DB) ----------
+// ---------- existing: reserve ----------
 const ReserveSchema = z.object({ ticketTypeId: z.string().uuid(), qty: z.number().int().positive() });
 export const reserveRoute = async (req,res)=>{
   const parse = ReserveSchema.safeParse(req.body);
@@ -71,7 +69,6 @@ export const commitReservation = async (reservationId) => {
   try {
     await client.query('BEGIN');
 
-    // Lock reservation + read ticket type counts to avoid races
     const r = await client.query(
       `SELECT r.id, r.ticket_type_id, r.qty, r.status, r.event_id,
               tt.total_qty, tt.sold_qty
@@ -89,7 +86,6 @@ export const commitReservation = async (reservationId) => {
 
     const row = r.rows[0];
 
-    // Only allow committing a HELD reservation
     if (String(row.status).toUpperCase() !== 'HELD') {
       await client.query('ROLLBACK');
       return { ok: false, reason: 'bad_status' };
@@ -130,7 +126,6 @@ export const commitReservation = async (reservationId) => {
       [reservationId]
     );
 
-    // Build outbox payload (rich details)
     const payload = {
       type: 'reservation.committed',
       reservationId,
@@ -140,7 +135,6 @@ export const commitReservation = async (reservationId) => {
       committed_at: new Date().toISOString()
     };
 
-    // insert outbox row (adjust column names if your schema differs)
     const outboxId = uuid();
     await client.query(
       `INSERT INTO outbox (id, aggregate, payload_json, status, created_at)
@@ -230,7 +224,7 @@ export const listReservationsRoute = async (req, res) => {
 const UpdateEvent = z.object({
   name: z.string().min(2),
   venue: z.string().min(1),
-  start_time: z.string(), // ISO
+  start_time: z.string(), 
   end_time: z.string()
 });
 export const updateEventRoute = async (req,res) => {
@@ -246,7 +240,6 @@ export const updateEventRoute = async (req,res) => {
   res.json({ id, name, venue, start_time, end_time, updated: true });
 };
 
-// Delete event (and related rows) using a transaction
 export const deleteEventRoute = async (req,res) => {
   const { id } = req.params;
   const client = await pool.connect();

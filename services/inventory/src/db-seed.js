@@ -1,12 +1,9 @@
-// services/inventory/src/db-seed.js
 import { pool, migrate } from './db.js';
 import { randomUUID } from 'crypto';
 
 async function seed() {
-  // ensure tables exist
   await migrate();
 
-  // create one event
   const eventId = randomUUID();
   await pool.query(
     `insert into events(id,name,venue,start_time,end_time)
@@ -15,7 +12,6 @@ async function seed() {
     [eventId, 'Concert A', 'Ruhuna Arena']
   );
 
-  // two ticket types
   const vipId = randomUUID();
   const genId = randomUUID();
 
@@ -36,7 +32,6 @@ async function seed() {
   console.log('Seeded event:', eventId);
 }
 
-// allow running via `npm run db:seed`
 if (import.meta.url === `file://${process.argv[1]}`) {
   seed().then(() => {
     console.log('Seed complete');
@@ -47,4 +42,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { seed }; // optional export
+export { seed }; 

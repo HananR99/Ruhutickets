@@ -11,10 +11,8 @@ const app = express();
 
 app.use(helmet({ contentSecurityPolicy: false }));
 
-// --- capture raw body so we can log it on parse errors ---
 app.use(express.json({
   verify: (req, _res, buf) => {
-    // store rawBody for debugging when JSON parse fails
     try { req.rawBody = buf && buf.toString('utf8'); } catch (e) { req.rawBody = undefined; }
   }
 }));
@@ -67,21 +65,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// ---------- health BEFORE auth ----------
+// ---------- health ----------
 // app.get('/health', (_req, res) => res.json({ service: 'api-gateway', ok: true, amqp_connected: !!ch, redis_connected: !!redis && redis.status === 'ready' }));
 app.get('/health', (_req, res) => {
   return res.json({ service: 'api-gateway', ok: true });
 });
 
-// ---------- static hosting BEFORE auth (serves / and login) ----------
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.get('/',      (_req,res) => res.sendFile(path.join(__dirname,'../public/login.html')));
 app.get('/login', (_req,res) => res.sendFile(path.join(__dirname,'../public/login.html')));
 
-// ---------- install auth AFTER static/login routes ----------
 app.use(requireAuth());
 
-// serve the rest of the static site (index.html) after auth
 app.use(express.static(path.join(__dirname,'../public')));
 
 // ---------- tiny proxy helper with /api/v1 -> / rewrite ----------
@@ -115,12 +110,10 @@ function proxy(targetHost) {
 }
 
 app.get('/api/v1/events', (req, res) => {
-  // If it's not a buyer, fall through to the normal proxy
   if (!req.user || req.user.role !== 'buyer') {
     return proxy('inventory:8080')(req, res);
   }
 
-  // Proxy upstream, but buffer & filter response
   const rewrittenPath = req.originalUrl.replace(/^\/api\/v1/, '');
   const targetUrl = new URL(rewrittenPath || '/', 'http://inventory:8080');
 
@@ -137,7 +130,6 @@ app.get('/api/v1/events', (req, res) => {
     pRes.on('data', d => chunks.push(d));
     pRes.on('end', () => {
       const buf = Buffer.concat(chunks);
-      // If upstream didn't return JSON, just pass it through
       if (!ct.includes('application/json')) {
         res.status(pRes.statusCode || 200);
         if (ct) res.setHeader('content-type', ct);
@@ -149,14 +141,12 @@ app.get('/api/v1/events', (req, res) => {
       catch { return res.status(502).json({ error: 'bad upstream JSON' }); }
 
       const now = Date.now();
-      // Keep events that haven't ended yet; fallback to start_time if no end_time
       const filtered = Array.isArray(payload)
         ? payload.filter(e => {
             const end   = e?.end_time   ? Date.parse(e.end_time)   : NaN;
             const start = e?.start_time ? Date.parse(e.start_time) : NaN;
             if (Number.isFinite(end))   return end   >= now;
             if (Number.isFinite(start)) return start >= now;
-            // if both missing/unparseable, keep it
             return true;
           })
         : payload;
@@ -176,14 +166,11 @@ app.use('/api/v1/orders',            proxy('order:8080'));
 app.use('/api/v1/webhooks/payment',  proxy('payment:8080'));
 app.use('/notify',                   proxy('notification:8080'));
 
-// ---------- error handler for malformed JSON ----------
 app.use((err, req, res, next) => {
-  // body-parser throws a SyntaxError for bad JSON
   if (err && err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     console.error('[BAD_JSON] parse error:', err.message, 'rawBody=', req.rawBody);
     return res.status(400).json({ error: 'invalid JSON body' });
   }
-  // fallback to default handler
   next(err);
 });
 

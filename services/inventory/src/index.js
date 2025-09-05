@@ -21,12 +21,10 @@ async function mq() {
 
 app.get('/health', async (_req, res) => {
   try {
-    // lightweight DB ping if pool exists
     if (typeof pool !== 'undefined' && pool) {
       await pool.query('SELECT 1');
     }
 
-    // AMQP check (uses helper which safely inspects channel state)
     let amqpConnected = null;
     try {
       amqpConnected = typeof amqpIsConnected === 'function' ? amqpIsConnected() : null;

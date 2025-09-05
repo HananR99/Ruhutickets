@@ -20,7 +20,6 @@ router.post('/commit', async (req, res) => {
       return res.status(409).json({ ok: false, error: result.reason || 'expired' });
     }
 
-    // fetch rich details to show in UI
     const { rows } = await pool.query(
       `select
          r.id,
@@ -38,7 +37,6 @@ router.post('/commit', async (req, res) => {
 
         const reservation = rows[0] || null;
 
-    // publish a reservation_committed notification (best-effort)
     if (reservation) {
       const notificationPayload = {
         type: 'reservation_committed',
@@ -56,7 +54,6 @@ router.post('/commit', async (req, res) => {
         producedAt: new Date().toISOString()
       };
 
-      // fire-and-forget but log result
       publishNotification(notificationPayload)
         .then(ok => {
           if (ok) {

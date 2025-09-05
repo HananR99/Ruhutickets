@@ -1,15 +1,12 @@
-# ---------------------------
 # Namespace
-# ---------------------------
 apiVersion: v1
 kind: Namespace
 metadata:
   name: ingress-nginx
 
 ---
-# ---------------------------
 # ServiceAccount
-# ---------------------------
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -17,9 +14,9 @@ metadata:
   namespace: ingress-nginx
 
 ---
-# ---------------------------
+
 # RBAC (minimal set for controller)
-# ---------------------------
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -62,7 +59,7 @@ subjects:
     namespace: ingress-nginx
 
 ---
-# Leader election (namespace-scoped) permissions
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -95,9 +92,9 @@ subjects:
     namespace: ingress-nginx
 
 ---
-# ---------------------------
-# Controller Deployment (no webhook, non-privileged ports, tolerations)
-# ---------------------------
+
+# Controller Deployment 
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -130,7 +127,7 @@ spec:
         - name: controller
           image: registry.k8s.io/ingress-nginx/controller:v1.9.6
           imagePullPolicy: IfNotPresent
-          command: ["/nginx-ingress-controller"]   # run binary directly (avoid dumb-init)
+          command: ["/nginx-ingress-controller"]   
           args:
             - --election-id=ingress-nginx-leader
             - --controller-class=k8s.io/ingress-nginx
@@ -160,7 +157,7 @@ spec:
             timeoutSeconds: 1
             successThreshold: 1
             failureThreshold: 3
-          # Relax security for Kind so exec is permitted
+          
           securityContext:
             privileged: true
             runAsNonRoot: false
@@ -187,9 +184,9 @@ spec:
               memory: 90Mi
 
 ---
-# ---------------------------
+
 # Service (NodePort → maps 80/443 to 30080/30443)
-# ---------------------------
+
 apiVersion: v1
 kind: Service
 metadata:

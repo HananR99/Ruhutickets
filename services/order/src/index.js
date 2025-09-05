@@ -26,7 +26,6 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-// POST /orders  { reservationId, paymentMethod }
 app.post('/orders', async (req, res) => {
   const { reservationId, paymentMethod = 'mock' } = req.body || {};
   if (!reservationId) return res.status(400).json({ error: 'reservationId required' });
@@ -35,7 +34,6 @@ app.post('/orders', async (req, res) => {
     'insert into orders(id,user_id,total_cents,currency,status) values($1,$2,$3,$4,$5)',
     [id, 'user1', 0, 'LKR', 'PENDING']
   );
-  // a real saga would publish OrderCreated here
   res.status(201).json({ id, status: 'PENDING', next: 'pay at /webhooks/payment/charge' });
 });
 

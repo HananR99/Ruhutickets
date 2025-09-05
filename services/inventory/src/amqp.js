@@ -42,7 +42,7 @@ export async function connectWithRetry() {
       return channel;
     } catch (err) {
       console.error('[inventory] AMQP connect failed:', err.message || err);
-      await wait(Math.min(2000 * attempt, 30000)); // exponential-ish backoff
+      await wait(Math.min(2000 * attempt, 30000)); 
     }
   }
   connecting = false;
@@ -63,7 +63,6 @@ export async function publishNotification(payload) {
     return true;
   } catch (err) {
     console.error('[inventory] publishNotification failed', err && err.message);
-    // Not throwing to avoid breaking main flow — we log and continue.
     return false;
   }
 }

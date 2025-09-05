@@ -1,7 +1,5 @@
-// services/api-gateway/src/auth.js
 import jwt from 'jsonwebtoken';
 
-// include /login.html and the login API itself
 const allowlist = new Set([
   '/health',
   '/',

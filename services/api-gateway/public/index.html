@@ -45,7 +45,6 @@
       window.location.href = 'login.html';
     };
 
-    // —— grab main containers & helper —— 
     const buyerEl = document.getElementById('buyer');
     const adminEl = document.getElementById('admin');
     const el      = html => {
@@ -68,14 +67,12 @@
     const claims = parseJwt(token);
     const role   = claims.role || '';
 
-    // hide the disallowed tab
     if (role === 'buyer') {
       document.getElementById('tab-admin').style.display = 'none';
     } else {
       document.getElementById('tab-buyer').style.display = 'none';
     }
 
-    // —— generic API wrapper that sends our JWT —— 
     const api = (p, opt = {}) => fetch(p, {
       headers: {
         'Content-Type': 'application/json',
@@ -93,7 +90,6 @@
       return data;
     });
 
-    // —— wire tabs —— 
     const tabBuyer = document.getElementById('tab-buyer');
     const tabAdmin = document.getElementById('tab-admin');
     tabBuyer.onclick = () => {
@@ -109,14 +105,12 @@
       buyerEl.style.display = 'none';
     };
 
-    // default‐select correct tab and kick off renders
     if (role === 'admin') tabAdmin.click();
     else                  tabBuyer.click();
 
     renderBuyer();
     renderAdmin();
 
-    // —— buyer UI —— 
     async function renderBuyer(){
       buyerEl.innerHTML = '';
       let events = [];
@@ -455,8 +449,7 @@
       resSel.onchange = loadRes;
       loadRes();
     }
-
-    // —— global flash banner —— 
+ 
     function showFlash(msg){
       const box = document.getElementById('flash');
       box.textContent = msg;

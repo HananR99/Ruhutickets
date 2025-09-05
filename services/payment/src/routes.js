@@ -2,7 +2,6 @@ import express from 'express';
 
 const router = express.Router();
 
-// Config: talk to Inventory via Docker DNS (or override with env)
 const INVENTORY_HOST = process.env.INVENTORY_HOST || 'http://inventory:8080';
 
 // Health
@@ -21,8 +20,7 @@ router.post('/webhooks/payment/charge', async (req, res) => {
     const { reservationId } = req.body || {};
     if (!reservationId) return res.status(400).json({ error: 'reservationId required' });
 
-    // Fake charge (success). You can add a random failure or delay if you want.
-    // await new Promise(r => setTimeout(r, 200)); // simulate PSP latency
+    // Fake charge (success). 
 
     // Finalize with Inventory
     const r = await fetch(`${INVENTORY_HOST}/inventory/commit`, {

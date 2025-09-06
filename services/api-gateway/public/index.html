@@ -56,7 +56,7 @@
     }
 
     /* App Shell */
-    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 12px; }
     .topbar {
       position: sticky; top: 0; z-index: 1000;
       backdrop-filter: saturate(180%) blur(8px);
@@ -126,7 +126,17 @@
       box-shadow: var(--shadow);
     }
     .card h2 { margin: 0 0 6px 0; font-size: 1.05rem }
-    .section { display:grid; gap:14px }
+    .section { display:grid; gap:16px }
+
+    /* Fix buyer card overflow caused by reservationId input */
+    .card .row { width: 100%; }
+    .card .row > * { min-width: 0; }            
+    .card .row .rid {
+      flex: 1 1 260px;                          
+      width: 100%;                              
+      max-width: 100%;
+    }
+    .card .row .pay { flex: 0 0 auto; }         
 
     /* Tabs */
     .tabs { display:flex; gap:10px; }
@@ -193,7 +203,7 @@
         <div>RuhuTickets <small>Demo</small></div>
       </div>
       <div class="tabs" style="margin-left:12px">
-        <div id="tab-buyer" class="tab">Buyer</div>
+        <div id="tab-buyer" class="tab">User</div>
         <div id="tab-admin" class="tab">Admin</div>
       </div>
       <div class="top-actions">
@@ -229,6 +239,16 @@
       d.innerHTML = html.trim();
       return d.firstChild;
     };
+
+    function errToText(e){
+      const data = e?.data?.error ?? e?.data ?? e;
+      if (!data) return 'Unknown error';
+      if (typeof data === 'string') return data;
+      if (Array.isArray(data)) return data.map(errToText).join(', ');
+      if (data.message) return data.message;
+      try { return JSON.stringify(data); } catch { return String(data); }
+    }
+
 
     // —— enforce JWT presence & parse role —— 
     const token = localStorage.getItem('jwt');
@@ -272,13 +292,13 @@
     tabBuyer.onclick = () => {
       tabBuyer.classList.add('active');
       tabAdmin.classList.remove('active');
-      buyerEl.style.display  = 'block';
+      buyerEl.style.display  = 'grid';
       adminEl.style.display  = 'none';
     };
     tabAdmin.onclick = () => {
       tabAdmin.classList.add('active');
       tabBuyer.classList.remove('active');
-      adminEl.style.display = 'block';
+      adminEl.style.display = 'grid';
       buyerEl.style.display = 'none';
     };
 
@@ -535,31 +555,51 @@
       });
 
       // create event handler
-      evCard.querySelector('#createEv').onclick = async ()=>{
+      evCard.querySelector('#createEv').onclick = async () => {
         const name  = evCard.querySelector('#name').value.trim();
         const venue = evCard.querySelector('#venue').value.trim();
         const start = evCard.querySelector('#start').value;
         const end   = evCard.querySelector('#end').value;
         const out   = evCard.querySelector('#evOut');
-        out.className='muted'; out.textContent='Creating...';
+
+        out.className = 'muted';
+        out.textContent = 'Creating...';
+
+        if (!name || !venue || !start || !end) {
+          out.className = 'err';
+          out.textContent = 'Please fill name, venue, start, and end.';
+          return;
+        }
+
+        const s = new Date(start);
+        const e = new Date(end);
+        if (isNaN(+s) || isNaN(+e) || e <= s) {
+          out.className = 'err';
+          out.textContent = 'End time must be after start time.';
+          return;
+        }
+
         try {
-          const r = await api('/api/v1/events',{
-            method:'POST',
+          const r = await api('/api/v1/events', {
+            method: 'POST',
             body: JSON.stringify({
               name, venue,
-              start_time: new Date(start).toISOString(),
-              end_time:   new Date(end).toISOString()
+              start_time: s.toISOString(),
+              end_time:   e.toISOString()
             })
           });
-          out.className='ok';
-          out.textContent = 'Created: '+r.id;
-          evSel .appendChild(new Option(`${r.name} @ ${r.venue}`, r.id));
+          out.className = 'ok';
+          out.textContent = 'Created: ' + r.id;
+
+          // evSel / resSel must already be defined above this handler
+          evSel.appendChild(new Option(`${r.name} @ ${r.venue}`, r.id));
           resSel.appendChild(new Option(r.name, r.id));
           evSel.value = r.id;
+
           renderBuyer();
-        } catch(e) {
-          out.className='err';
-          out.textContent = e.data?.error || e.message;
+        } catch (e) {
+          out.className = 'err';
+          out.textContent = errToText(e);
         }
       };
 
@@ -584,7 +624,7 @@
           renderBuyer();
         } catch(e) {
           out.className='err';
-          out.textContent = e.data?.error || e.message;
+          out.textContent = errToText(e);
         }
       };
 
@@ -595,7 +635,7 @@
         try {
           rows = await api(`/api/v1/inventory/reservations${chosen ? ('?eventId='+encodeURIComponent(chosen)) : ''}`);
         } catch(e) {
-          resCard.querySelector('#resTbl').innerHTML = `<div class="err">${e.data?.error||e.message}</div>`;
+          resCard.querySelector('#resTbl').innerHTML = `<div class="err">${errToText(e)}</div>`;
           return;
         }
         if (!rows.length) {

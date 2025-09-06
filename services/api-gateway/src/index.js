@@ -18,8 +18,8 @@ app.use(express.json({
 }));
 
 const USERS = {
-  'buyer':  'buyer-pass',
-  'admin':  'admin-pass',
+  'user':  'pass123',
+  'admin':  'pass123',
 };
 
 // LOGIN endpoint
